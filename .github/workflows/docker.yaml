@@ -25,11 +25,18 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest
         with:
           # list of Docker images to use as base name for tags
           images: |
@@ -73,3 +80,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+
+      # Verify with: gh attestation verify oci://index.docker.io/sphinxlightning/livekit-server@sha256:<digest> --owner stakwork
+      - name: Attest build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: index.docker.io/sphinxlightning/livekit-server
+          subject-digest: ${{ steps.docker_build.outputs.digest }}
+          push-to-registry: true
